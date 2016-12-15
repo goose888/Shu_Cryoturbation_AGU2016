@@ -1,0 +1,20 @@
+\NeedsTeXFormat{LaTeX2e}[1995/12/01]
+\ProvidesPackage{fancybullets}[2003/07/04 Bullets with shades, improved]
+% Emmanuel Thomé <thome@lix.polytechnique.fr>, June 2003
+% freely distributable.
+
+% This is a mere wrapper for pslogos, using the proper prologue.
+\RequirePackage{pslogos}
+\def\newbullet#1#2#3#4{%
+	% #1: intended command name
+	% #2: hispot color
+	% #3: shade end color
+	% #4: primary width
+	\special{header=shfill_emulate.pro}%
+	\DeclarePSLogo{#1}{new_bullets.pro}%
+		{bullets_dict begin bullet@simple end}%
+		{80 170 400 400}{gsave\space
+		\csname color@#2\endcsname [currentrgbcolor]\space
+		\csname color@#3\endcsname [currentrgbcolor]\space
+		}{width=#4}%
+}

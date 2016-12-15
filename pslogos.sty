@@ -1,0 +1,195 @@
+\NeedsTeXFormat{LaTeX2e}[1995/12/01]
+\ProvidesPackage{pslogos}[2003/07/04 A generic package for including PostScript logos]
+% Emmanuel Thomé <thome@lix.polytechnique.fr>, June 2003
+% freely distributable.
+
+% Logos must be provided as Postscript procsets, and callable via a
+% single command, not necessarily gsave/grestore-protected (it's done by
+% the \speciak driver, dvips presumably).
+%
+% The baseline position must be given as a ratio, presumably between 0 and 1
+
+\RequirePackage{publish}
+\RequirePackage{keyval}
+
+% \psl@mydivision:
+%
+% Divides #2 by #3, put the result in #1.
+% 3digits of accuracy are enough. Both are dimensions
+%
+% It's done by default with the following scale-divide-unscale-roundup
+% trick:
+\iftrue
+\def\psl@mydivision#1#2#3{%
+	\bgroup@published
+		\@tempdima=#2%
+		\@tempdimb=#3%
+		\divide\@tempdimb by256%
+		\divide\@tempdima\@tempdimb
+		\@tempcnta=\number\@tempdima
+		\@tempdima=\@tempcnta\p@
+		\divide\@tempdima by256%
+		\edef#1{\strip@pt\@tempdima}%
+		\publish#1%
+	\egroup@published
+}
+\else
+% I'm not completely satisfied with this trick though, so here's another
+% way to do the same thing. Of course, it's horribly overkill, and much
+% mcuh slower ! (and while I'm at it, I could even go for computing sines
+% and cosines for doing the rotating...).
+\RequirePackage{fp-basic}
+\FPmessagesfalse
+\def\psl@mydivision#1#2#3{%
+	\bgroup@published
+		\@tempdima=#2\edef\reserved@a{\strip@pt\@tempdima}%
+		\@tempdimb=#3\edef\reserved@b{\strip@pt\@tempdimb}%
+		\FPdiv#1\reserved@a\reserved@b
+		\publish#1%
+	\egroup@published
+}
+\fi
+
+	
+\define@key{psl@}{width}{\def\width{#1}}
+\define@key{psl@}{height}{\def\height{#1}}
+\define@key{psl@}{scale}{\def\scale{#1}}
+\define@key{psl@}{sink}{\def\sink{#1}}
+\define@key{psl@}{clip}[false]{\def\queryclip{\csname @tempswa#1\endcsname}}
+
+\def\psl@doscl{%
+	% Input: \bbh, \bbw, \width, and \height
+	% If nothing is specified, we trust the \scale definition (which
+	% may be also empty, btw).
+	\ifx\width\relax
+		\ifx\height\relax
+			\ifx\scale\relax
+				\@tempdima=\default@height
+				\@tempdimb=\default@width
+				\let\psl@scl\psl@defscl
+			\else
+				\@tempdima=\default@height
+				\@tempdimb=\default@width
+				\@tempdima=\scale\@tempdima
+				\@tempdimb=\scale\@tempdimb
+				\edef\psl@scl{%
+					\psl@defscl\space
+					\scale\space dup scale}%
+			\fi
+		\else
+			\@tempdima=\height
+			\@tempdimb=\whratio\@tempdima
+			\psl@mydivision\scale\@tempdima\bbh
+			\edef\psl@scl{\scale\space dup scale}%
+		\fi
+	\else
+		\ifx\height\relax
+			\@tempdimb=\width
+			\@tempdima=\hwratio\@tempdimb
+			\psl@mydivision\scale\@tempdimb\bbw
+			\edef\psl@scl{\scale\space dup scale}%
+		\else
+			\@tempdima=\height
+			\@tempdimb=\width
+			\psl@mydivision\sx\@tempdimb\bbw
+			\psl@mydivision\sy\@tempdima\bbh
+			\edef\psl@scl{\sx\space\sy\space scale}%
+		\fi
+	\fi
+}
+
+\def\DeclarePSLogo#1#2#3#4#5#6{%
+	\bgroup@published
+	% #1 : intended command name
+	% #2 : postscript procset name
+	% #3 : postscript command name
+	% #4 : Bounding Box produced.
+	% #5 : Additional PS code to insert before the PS execution
+	% #6 : default parameters(width/height/sink only).
+	\def\reserved@a{#2}%
+	\ifx\reserved@a\empty\else\special{header=\reserved@a}\fi
+	\def\readbb##1 ##2 ##3 ##4\kaboom{%
+		\def\llx{##1}\def\lly{##2}\def\urx{##3}\def\ury{##4}%
+	}%
+	\readbb#4\kaboom
+	\@tempcnta=\urx\advance\@tempcnta-\llx\edef\bbw{\the\@tempcnta}%
+	\@tempcnta=\ury\advance\@tempcnta-\lly\edef\bbh{\the\@tempcnta}%
+	\edef\psl@clip{\llx\space\lly\space\bbw\space\bbh\space rectclip}%
+	\@tempdima=\bbw bp\edef\bbw{\the\@tempdima}%
+	\@tempdima=\bbh bp\edef\bbh{\the\@tempdima}%
+	\psl@mydivision\whratio\bbw\bbh
+	\psl@mydivision\hwratio\bbh\bbw
+	\let\width\relax
+	\let\scale\relax
+	\let\height\relax
+	\def\sink{0}% not \relax in any case !. \empty is equivalent to 1
+	\iftrue
+		\def\default@width\bbw
+		\def\default@height\bbh
+		\let\psl@defscl\empty
+	\else
+		\edef\width{\bbw}%
+	\fi
+	\setkeys{psl@}{#6}%
+	\psl@doscl
+	\edef\default@height{\the\@tempdima}%
+	\edef\default@width{\the\@tempdimb}%
+	\let\psl@defscl=\psl@scl
+	\edef\psl@tsl{\llx\space neg \lly\space neg translate}%
+	\edef\required@data{%
+		\noexpand\def\noexpand\bbw{\bbw}%
+		\noexpand\def\noexpand\bbh{\bbh}%
+		\noexpand\def\noexpand\whratio{\whratio}%
+		\noexpand\def\noexpand\hwratio{\hwratio}%
+		\noexpand\def\noexpand\sink{\sink}%
+		\noexpand\def\noexpand\default@width{\default@width}%
+		\noexpand\def\noexpand\default@height{\default@height}%
+		\noexpand\def\noexpand\psl@defscl{\psl@defscl}%
+		\noexpand\def\noexpand\psl@clip{\psl@clip}%
+		\noexpand\def\noexpand\psl@tsl{\psl@tsl}%
+	}%
+	\@temptokena=\expandafter{\required@data}%
+	\expandafter\edef\csname#1\endcsname{\noexpand\@genericlogo{#3}{#5}{\the\@temptokena}}%
+	\expandafter\publish\csname#1\endcsname
+	\egroup@published
+}
+
+\def\@genericlogo#1#2#3{%
+	\@ifnextchar[{%
+		\@@genericlogo{#1}{#2}{#3}%
+	}{%
+		\@@genericlogo{#1}{#2}{#3}[]%
+	}%
+}
+
+% Note: I know I'm off by 0.375% by not distinguishing bp's and pt's
+% (1in=72bp=72.27pt)
+\def\@@genericlogo#1#2#3[#4]{%
+	% #1 : postscript command name
+	% #2 : Additional PS code to insert before the PS execution
+	% #3 : default parameters
+	\bgroup
+	#3%
+	\let\width\relax
+	\let\height\relax
+	\let\scale\relax
+	\let\clip\relax
+	\def\queryclip{\@tempswafalse}%
+	%
+	\setkeys{psl@}{#4}%
+	\psl@doscl% tempdima = height, tempdimb = width.
+	\queryclip
+	\if@tempswa\else
+		\let\psl@clip\empty
+	\fi
+	\setbox0\hbox to \@tempdimb\bgroup
+	\special{" \psl@scl\space\psl@tsl\space
+		\psl@clip\space #2\space #1}%
+	\vrule width\z@  depth\z@ height \@tempdima
+	\vrule width\@tempdimb height\z@ depth\z@
+	\egroup
+	\@tempdima=-\ht0%
+	\@tempdima=\sink\@tempdima%
+	\raisebox\@tempdima{\box0}%
+	\egroup
+}

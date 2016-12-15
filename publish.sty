@@ -1,0 +1,73 @@
+\NeedsTeXFormat{LaTeX2e}[1997/06/01]
+\ProvidesPackage{publish}[2003/06/30 Facility to carry a macro one level out of its scope]
+% Emmanuel Thomé <thome@lix.polytechnique.fr>, June 2003
+% freely distributable.
+
+\@ifundefined{@temptokenb}{\newtoks\@temptokenb}{}
+
+% Use: enclose your stuff within a \bgroup@published...\egroup@published
+% pair. For simple macros that you want to export, do \publish\foo. For
+% more complicated macros, taking arguments, do:
+% \publish<#1\used{{#1}}>\foo ; Note the double pair of braces, it's
+% extremely important.
+%
+% You can even publish a macro of very complicated form, like in the
+% example after \endinput.
+%
+% Note: I used angle braces as primary separators, so that you can use
+% \publish with macros taking square brackets without having difficulties
+% with argument mangling. But in any case, put an extra level of braces,
+% and you'll be alright.
+%
+\long\def\pb@parsemacro#1/#2/#3\period{%
+	\def#1#2{#3}%
+}
+
+\def\publish@generic<#1\used#2>#3{%
+	\@temptokena={#3/#1}%
+	\@temptokenb=\expandafter{#3#2}%
+	\edef\reserved@a{%
+		\noexpand\pb@parsemacro
+		\the\@temptokena/\the\@temptokenb
+		\noexpand\period
+	}%
+	\@temptokena=\expandafter{\@end@defines}%
+	\@temptokenb=\expandafter{\reserved@a}%
+	\edef\@end@defines{\the\@temptokena\the\@temptokenb}%
+	\@temptokena=\expandafter{\@end@defines}%
+	%\typeout{\string\@end@defines\space is now: \the\@temptokena}%
+}%
+
+\def\publish@inner{%
+	\ifx\@let@token<\relax
+		\let\next=\publish@generic
+	\else
+		\def\next{\publish@generic<\used>}%
+	\fi\next}
+\def\publish{\futurelet\@let@token\publish@inner}
+
+\def\bgroup@published{%
+	\bgroup
+	\let\@end@defines=\@empty
+}
+
+\def\egroup@published{%
+	\@temptokena=\expandafter{\@end@defines}%
+	\edef\@end@defines{\noexpand\egroup\the\@temptokena}%
+	\@temptokena=\expandafter{\@end@defines}%
+	%\typeout{\string\@end@defines\space is now: \the\@temptokena}%
+	\@end@defines}
+
+\endinput
+%%% Typical example:
+
+\bgroup@published
+	\def\foo#1{#1#1}%
+	\def\bar{\show\foo}%
+	\def\gee{@@}%
+	% do lots of stuff, mess up with reserved@a and so on...
+	\publish\bar
+	\publish<#1\used{{#1}}>\foo
+	\def\funky[#1]\toy#2\verycool*#3{#3#2#1}%
+	\publish<[#1]\toy#2\verycool*#3\used[#1]\toy#2\verycool*{#3}>\funky
+\egroup@published
